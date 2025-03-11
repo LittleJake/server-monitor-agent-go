@@ -4,7 +4,11 @@ go 1.23.0
 
 toolchain go1.23.7
 
-require github.com/shirou/gopsutil/v4 v4.25.2
+require (
+	github.com/gomodule/redigo v1.9.2
+	github.com/joho/godotenv v1.5.1
+	github.com/shirou/gopsutil/v4 v4.25.2
+)
 
 require (
 	github.com/ebitengine/purego v0.8.2 // indirect
