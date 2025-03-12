@@ -24,28 +24,28 @@ func getThroughput() string {
 	rx := float32(counters[0].BytesRecv) / 1024 / 1024 / 1024
 	tx := float32(counters[0].BytesSent) / 1024 / 1024 / 1024
 
-	returnStr := ""
+	throughput := ""
 	if rx > 1024 {
 		rx = rx / 1024
-		returnStr += fmt.Sprintf("↓%.2f TB / ", rx)
+		throughput += fmt.Sprintf("↓%.2f TB / ", rx)
 	} else {
-		returnStr += fmt.Sprintf("↓%.2f GB / ", rx)
+		throughput += fmt.Sprintf("↓%.2f GB / ", rx)
 	}
 	if tx > 1024 {
 		tx = tx / 1024
-		returnStr += fmt.Sprintf("↑%.2f TB", tx)
+		throughput += fmt.Sprintf("↑%.2f TB", tx)
 	} else {
-		returnStr += fmt.Sprintf("↑%.2f GB", tx)
+		throughput += fmt.Sprintf("↑%.2f GB", tx)
 	}
 
-	// fmt.Print(returnStr + "\n")
-	return returnStr
+	logMessage(DEBUG, throughput)
+	return throughput
 }
 
 func getProcessNum() string {
 	// Get process number
 	processes, _ := process.Processes()
-	// fmt.Printf("%v\n", len(processes))
+	logMessage(DEBUG, fmt.Sprintf("%v\n", len(processes)))
 	return fmt.Sprintf("%v", len(processes))
 }
 
@@ -97,7 +97,7 @@ func getDiskInfo(exclude ...string) string {
 	}
 
 	data, _ := json.Marshal(disks)
-	// fmt.Print(string(data) + "\n")
+	logMessage(DEBUG, string(data))
 	return string(data)
 }
 
@@ -180,7 +180,6 @@ func getIO() string {
 
 	IO_FORMER = counters
 	data, _ := json.Marshal(io)
-	// fmt.Print(string(data) + "\n")
 	return string(data)
 }
 
@@ -225,14 +224,14 @@ func getNetwork() string {
 
 	NET_FORMER = counters
 	data, _ := json.Marshal(network)
-	// fmt.Print(string(data) + "\n")
+	logMessage(DEBUG, fmt.Sprint(string(data)))
 	return string(data)
 }
 
 func getCPUInfo() string {
 	info, _ := cpu.Info()
 
-	// fmt.Printf("%vx %v\n", info[0].Cores, info[0].ModelName)
+	logMessage(DEBUG, fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName))
 	return fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName)
 }
 
@@ -247,7 +246,7 @@ func getUptime() string {
 	minutes := int(delta.Minutes()) % 60
 	seconds := int(delta.Seconds()) % 60
 
-	// fmt.Printf("%d Days %02d:%02d:%02d\n", days, hours, minutes, seconds)
+	logMessage(DEBUG, fmt.Sprintf("%d Days %02d:%02d:%02d", days, hours, minutes, seconds))
 	return fmt.Sprintf("%d Days %02d:%02d:%02d", days, hours, minutes, seconds)
 }
 
@@ -255,14 +254,14 @@ func getConnections() string {
 	tcp, _ := net.Connections("tcp")
 	udp, _ := net.Connections("udp")
 
-	// fmt.Printf("TCP: %v, UDP: %v\n", len(tcp), len(udp))
+	logMessage(DEBUG, fmt.Sprintf("TCP: %v, UDP: %v\n", len(tcp), len(udp)))
 	return fmt.Sprintf("TCP: %v, UDP: %v", len(tcp), len(udp))
 }
 
 func getSysVersion() string {
 	info, _ := host.Info()
 
-	// fmt.Printf("%v %v\n", info.Platform, info.PlatformVersion)
+	logMessage(DEBUG, fmt.Sprintf("%v %v\n", info.Platform, info.PlatformVersion))
 	return fmt.Sprintf("%v %v", info.Platform, info.PlatformVersion)
 }
 
@@ -270,7 +269,7 @@ func getLoadAvg() string {
 	// Get Load avg
 	loadAvg, _ := load.Avg()
 
-	// fmt.Printf("%.2f, %.2f, %.2f\n", loadAvg.Load1, loadAvg.Load5, loadAvg.Load15)
+	logMessage(DEBUG, fmt.Sprintf("%.2f, %.2f, %.2f\n", loadAvg.Load1, loadAvg.Load5, loadAvg.Load15))
 	return fmt.Sprintf("%.2f, %.2f, %.2f", loadAvg.Load1, loadAvg.Load5, loadAvg.Load15)
 }
 
@@ -292,6 +291,7 @@ func getLoad() string {
 		cpuTimes[0].Guest + cpuTimes[0].GuestNice) - (CPU_FORMER[0].User + CPU_FORMER[0].System + CPU_FORMER[0].Idle + CPU_FORMER[0].Nice +
 		CPU_FORMER[0].Iowait + CPU_FORMER[0].Irq + CPU_FORMER[0].Softirq + CPU_FORMER[0].Steal +
 		CPU_FORMER[0].Guest + CPU_FORMER[0].GuestNice)
+
 	percentages := map[string]string{
 		"user":       fmt.Sprintf("%.2f", ((cpuTimes[0].User-CPU_FORMER[0].User)/total)*100),
 		"system":     fmt.Sprintf("%.2f", ((cpuTimes[0].System-CPU_FORMER[0].System)/total)*100),
@@ -306,9 +306,9 @@ func getLoad() string {
 	}
 
 	data, _ := json.Marshal(percentages)
-
-	// fmt.Print(string(data) + "\n")
 	CPU_FORMER = cpuTimes
+
+	logMessage(DEBUG, string(data))
 	return string(data)
 }
 
@@ -337,6 +337,6 @@ func getMemInfo() string {
 
 	data, _ := json.Marshal(info)
 
-	// fmt.Print(string(data))
+	logMessage(DEBUG, string(data))
 	return string(data)
 }

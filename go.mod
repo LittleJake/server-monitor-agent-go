@@ -6,6 +6,7 @@ toolchain go1.23.7
 
 require (
 	github.com/gomodule/redigo v1.9.2
+	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v4 v4.25.2
 )
