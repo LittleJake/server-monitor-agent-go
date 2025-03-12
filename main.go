@@ -61,7 +61,7 @@ func init() {
 	// Load environment variables
 	err := godotenv.Load(".env")
 	if err != nil {
-		logger.Fatalf("Error loading .env file: %v", err)
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 	HOST = getEnv("HOST", "localhost")
 	PORT = getEnv("PORT", "6379")
