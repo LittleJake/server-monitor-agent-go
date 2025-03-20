@@ -30,6 +30,6 @@ jobs:
           apt-get update && apt-get install -y musl-tools
           CGO_ENABLED=1
           CC=musl-gcc
-        ldflags: '-s -w -linkmode external -extldflags -static'
+        ldflags: '-s -w -extldflags -static'
         extra_files: README.md .env.example
         asset_name: server-monitor-agent-go-${{ matrix.goos }}-${{ matrix.goarch }}
