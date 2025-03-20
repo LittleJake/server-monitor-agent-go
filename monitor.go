@@ -261,8 +261,8 @@ func getConnections() string {
 func getSysVersion() string {
 	info, _ := host.Info()
 
-	logMessage(DEBUG, fmt.Sprintf("%v %v\n", info.Platform, info.PlatformVersion))
-	return fmt.Sprintf("%v %v", info.Platform, info.PlatformVersion)
+	logMessage(DEBUG, fmt.Sprintf("%v %v %v\n", info.OS, info.Platform, info.PlatformVersion))
+	return fmt.Sprintf("%v %v %v", info.OS, info.Platform, info.PlatformVersion)
 }
 
 func getLoadAvg() string {
