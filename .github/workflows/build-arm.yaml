@@ -24,5 +24,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
+        ldflags: '-s -w -linkmode external -extldflags -static'
         extra_files: README.md .env.example
         asset_name: server-monitor-agent-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.goarm }}
