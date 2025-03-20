@@ -25,7 +25,7 @@ jobs:
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
         pre_command: |
-          apt-get update && apt-get install -y musl-tools && export CGO_ENABLED=1 && export CC=musl-gcc
+          apt-get update && apt-get install -y musl-tools && export CGO_ENABLED=0 && export CC=musl-gcc
         ldflags: '-s -w -extldflags "-static"'
         extra_files: README.md .env.example
         asset_name: server-monitor-agent-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.goarm }}
