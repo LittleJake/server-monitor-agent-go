@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20250311.1-golang"
+	VERSION               = "Alpha-20250418.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -27,7 +27,11 @@ var (
 	SOCKET_TIMEOUT        int
 	SERVER_URL            string
 	SERVER_TOKEN          string
+	PASSWORD              string
 	REPORT_MODE           string
+	REPORT_TIME           int
+	RETENTION_TIME        int
+	DATA_TIMEOUT          int
 	UUID                  string
 	USER_AGENT            = VERSION + " +https://github.com/LittleJake/server-monitor-agent-go"
 	SERVER_URL_INFO       string
@@ -68,9 +72,13 @@ func init() {
 	SSL, _ = strconv.ParseBool(getEnv("SSL", "false"))
 	REPORT_ONCE, _ = strconv.ParseBool(getEnv("REPORT_ONCE", "false"))
 	SOCKET_TIMEOUT, _ = strconv.Atoi(getEnv("SOCKET_TIMEOUT", "10"))
+	REPORT_TIME, _ = strconv.Atoi(getEnv("REPORT_TIME", "60"))
+	RETENTION_TIME, _ = strconv.Atoi(getEnv("RETENTION_TIME", "86400")) // 1 day
+	DATA_TIMEOUT, _ = strconv.Atoi(getEnv("DATA_TIMEOUT", "259200"))    // 3 days
 	SERVER_URL = getEnv("SERVER_URL", "http://localhost:8000")
 	REPORT_MODE = strings.ToLower(getEnv("REPORT_MODE", "redis"))
 	SERVER_TOKEN = getEnv("SERVER_TOKEN", "")
+	PASSWORD = getEnv("PASSWORD", "")
 	LOG_LEVEL = getEnv("LOG_LEVEL", "INFO")
 	UUID = loadUUID()
 
@@ -100,7 +108,17 @@ func getEnv(key, defaultValue string) string {
 
 func getRedisConn() redis.Conn {
 	// Connect to Redis
-	conn, _ := redis.Dial("tcp", fmt.Sprintf("%v:%v", HOST, PORT), redis.DialUseTLS(SSL))
+	conn, err := redis.Dial(
+		"tcp",
+		fmt.Sprintf("%v:%v", HOST, PORT),
+		redis.DialUseTLS(SSL),
+		redis.DialConnectTimeout(time.Duration(SOCKET_TIMEOUT)*time.Second),
+		redis.DialPassword(PASSWORD),
+	)
+	if err != nil {
+		logMessage(ERROR, fmt.Sprintf("Error connecting to Redis: %v", err))
+		return nil
+	}
 
 	return conn
 }
@@ -279,6 +297,33 @@ func report() {
 	logMessage(DEBUG, string(jsonInfo))
 
 	if REPORT_MODE == "redis" {
+
+		conn := getRedisConn()
+		if conn == nil {
+			logMessage(ERROR, "Fail to connect to Redis")
+			return
+		}
+
+		conn.Send("MULTI")
+		conn.Send("HSET", "system_monitor:hashes", UUID, IPV4)
+		for key, value := range info {
+			conn.Send("HSET", "system_monitor:info:"+UUID, key, value)
+		}
+		conn.Send("ZADD", "system_monitor:collection:"+UUID, time.Now().Unix(), string(jsonAggregateStat))
+
+		conn.Send("ZREMRANGEBYSCORE", "system_monitor:collection:"+UUID, 0, time.Now().Unix()-int64(RETENTION_TIME))
+		conn.Send("EXPIRE", "system_monitor:hashes", RETENTION_TIME)
+		conn.Send("EXPIRE", "system_monitor:info:"+UUID, RETENTION_TIME)
+		conn.Send("EXPIRE", "system_monitor:collection:"+UUID, RETENTION_TIME)
+
+		resp, err := conn.Do("EXEC")
+		if err != nil {
+			logMessage(ERROR, fmt.Sprintf("Error executing command: %v", err))
+			return
+		}
+		logMessage(DEBUG, fmt.Sprintf("Response: %v", resp))
+		logMessage(INFO, "Finish Reporting")
+		conn.Close()
 	}
 	if REPORT_MODE == "http" {
 		if SERVER_TOKEN == "" {
@@ -297,7 +342,7 @@ func main() {
 		report()
 		// getInfo()
 		if !REPORT_ONCE {
-			time.Sleep(30 * time.Second)
+			time.Sleep(time.Duration(REPORT_TIME) * time.Second)
 			continue
 		}
 		break
