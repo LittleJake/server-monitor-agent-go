@@ -13,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
+	"github.com/shirou/gopsutil/v4/sensors"
 )
 
 var NET_FORMER []net.IOCountersStat = nil
@@ -233,6 +234,20 @@ func getCPUInfo() string {
 
 	logMessage(DEBUG, fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName))
 	return fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName)
+}
+
+func getTemperature() string {
+	info, _ := sensors.SensorsTemperatures()
+	temperature := make(map[string]float64)
+
+	for _, sensor := range info {
+		temperature[sensor.SensorKey] = sensor.Temperature
+		logMessage(DEBUG, fmt.Sprintf("%v", sensor.String()))
+	}
+
+	data, _ := json.Marshal(temperature)
+	logMessage(DEBUG, string(data))
+	return string(data)
 }
 
 func getUptime() string {

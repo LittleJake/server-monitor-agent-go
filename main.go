@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20250418.1-golang"
+	VERSION               = "Alpha-20250418.2-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -133,7 +133,7 @@ func getAggregateStat() map[string]interface{} {
 		"Memory":  json.RawMessage(getMemInfo()),
 		"Network": json.RawMessage(getNetwork()),
 		"Ping":    json.RawMessage("{}"),
-		"Thermal": json.RawMessage("{}"),
+		"Thermal": json.RawMessage(getTemperature()),
 	}
 
 	return aggregateStat
