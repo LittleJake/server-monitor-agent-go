@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20250418.2-golang"
+	VERSION               = "Alpha-20250604.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -87,8 +87,8 @@ func init() {
 	SERVER_URL_HASH = fmt.Sprintf("%s/api/report/hash/%s", SERVER_URL, UUID)
 	SERVER_URL_COMMAND = fmt.Sprintf("%s/api/report/command/%s", SERVER_URL, UUID)
 
-	IPV4_API = getEnv("IPV4_API", "https://api.ipify.org")
-	IPV6_API = getEnv("IPV6_API", "https://api6.ipify.org")
+	IPV4_API = getEnv("IPV4_API", "https://api-ipv4.ip.sb/ip")
+	IPV6_API = getEnv("IPV6_API", "https://api-ipv6.ip.sb/ip")
 
 	// Initialize logger
 	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
