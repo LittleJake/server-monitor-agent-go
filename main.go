@@ -43,6 +43,10 @@ var (
 	IPV4_API              string
 	IPV6_API              string
 	COUNTRY               map[string]string
+	CPU                   string
+	SYSTEM_VERSION        string
+	UPTIME                string
+	ALIVE_CHECK_TIME      int
 )
 
 func loadUUID() string {
@@ -73,8 +77,9 @@ func init() {
 	REPORT_ONCE, _ = strconv.ParseBool(getEnv("REPORT_ONCE", "false"))
 	SOCKET_TIMEOUT, _ = strconv.Atoi(getEnv("SOCKET_TIMEOUT", "10"))
 	REPORT_TIME, _ = strconv.Atoi(getEnv("REPORT_TIME", "60"))
-	RETENTION_TIME, _ = strconv.Atoi(getEnv("RETENTION_TIME", "86400")) // 1 day
-	DATA_TIMEOUT, _ = strconv.Atoi(getEnv("DATA_TIMEOUT", "259200"))    // 3 days
+	RETENTION_TIME, _ = strconv.Atoi(getEnv("RETENTION_TIME", "86400"))   // 1 day
+	DATA_TIMEOUT, _ = strconv.Atoi(getEnv("DATA_TIMEOUT", "259200"))      // 3 days
+	ALIVE_CHECK_TIME, _ = strconv.Atoi(getEnv("ALIVE_CHECK_TIME", "600")) // 10 minutes
 	SERVER_URL = getEnv("SERVER_URL", "http://localhost:8000")
 	REPORT_MODE = strings.ToLower(getEnv("REPORT_MODE", "redis"))
 	SERVER_TOKEN = getEnv("SERVER_TOKEN", "")
@@ -96,6 +101,10 @@ func init() {
 
 	getIP()
 	getCountry()
+
+	CPU = getCPUInfo()
+	SYSTEM_VERSION = getSysVersion()
+	UPTIME = getUptime()
 }
 
 func getEnv(key, defaultValue string) string {
@@ -145,15 +154,15 @@ func getInfo() map[string]interface{} {
 		"Connection":     getConnections(),
 		"Country":        COUNTRY["country_name"],
 		"Country Code":   COUNTRY["country_code"],
-		"CPU":            getCPUInfo(),
+		"CPU":            CPU,
 		"IPV4":           replaceString(IPV4, "\\d*\\.\\d*\\.\\d*", "*.*.*"),
 		"IPV6":           replaceString(IPV6, "[a-fA-F0-9]*:", "*:"),
 		"Load Average":   getLoadAvg(),
 		"Process":        getProcessNum(),
-		"System Version": getSysVersion(),
+		"System Version": SYSTEM_VERSION,
 		"Throughput":     getThroughput(),
 		"Update Time":    time.Now().Unix(),
-		"Uptime":         getUptime(),
+		"Uptime":         UPTIME,
 		"Agent Version":  VERSION,
 	}
 
@@ -315,6 +324,7 @@ func report() {
 		conn.Send("EXPIRE", "system_monitor:hashes", RETENTION_TIME)
 		conn.Send("EXPIRE", "system_monitor:info:"+UUID, RETENTION_TIME)
 		conn.Send("EXPIRE", "system_monitor:collection:"+UUID, RETENTION_TIME)
+		conn.Send("SETEX", "system_monitor:alive:"+UUID, ALIVE_CHECK_TIME, "1")
 
 		resp, err := conn.Do("EXEC")
 		if err != nil {

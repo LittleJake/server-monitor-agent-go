@@ -230,7 +230,12 @@ func getNetwork() string {
 }
 
 func getCPUInfo() string {
-	info, _ := cpu.Info()
+	info, err := cpu.Info()
+
+	if err != nil || len(info) == 0 {
+		logMessage(ERROR, "Fail to get CPU info")
+		return "Unknown CPU"
+	}
 
 	logMessage(DEBUG, fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName))
 	return fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName)
@@ -277,7 +282,11 @@ func getSysVersion() string {
 	info, _ := host.Info()
 
 	logMessage(DEBUG, fmt.Sprintf("%v %v %v\n", info.OS, info.Platform, info.PlatformVersion))
-	return fmt.Sprintf("%v %v %v", info.OS, info.Platform, info.PlatformVersion)
+	if info.Platform != "" {
+		return fmt.Sprintf("%v %v", info.Platform, info.PlatformVersion)
+	} else {
+		return fmt.Sprintf("%v %v", info.OS, info.PlatformVersion)
+	}
 }
 
 func getLoadAvg() string {
