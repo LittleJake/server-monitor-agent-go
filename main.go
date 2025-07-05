@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,13 +50,13 @@ var (
 	ALIVE_CHECK_TIME      int
 )
 
-func loadUUID() string {
+func loadUUID(execDir string) string {
 	// Load UUID from file
-	file, err := os.ReadFile(".uuid")
+	file, err := os.ReadFile(filepath.Join(execDir, ".uuid"))
 	if err != nil {
 		//generate new UUID
 		newUUID := strings.ReplaceAll(uuid.New().String(), "-", "")
-		err := os.WriteFile(".uuid", []byte(newUUID), 0644)
+		err := os.WriteFile(filepath.Join(execDir, ".uuid"), []byte(newUUID), 0644)
 		if err != nil {
 			log.Fatalf("Error writing UUID: %v", err)
 		}
@@ -65,12 +66,18 @@ func loadUUID() string {
 }
 
 func init() {
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Error getting executable path: %v", err)
+	}
+	execDir := filepath.Dir(execPath)
 
 	// Load environment variables
-	err := godotenv.Load(".env")
+	err = godotenv.Load(filepath.Join(execDir, ".env"))
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+
 	HOST = getEnv("HOST", "localhost")
 	PORT = getEnv("PORT", "6379")
 	SSL, _ = strconv.ParseBool(getEnv("SSL", "false"))
@@ -85,7 +92,7 @@ func init() {
 	SERVER_TOKEN = getEnv("SERVER_TOKEN", "")
 	PASSWORD = getEnv("PASSWORD", "")
 	LOG_LEVEL = getEnv("LOG_LEVEL", "INFO")
-	UUID = loadUUID()
+	UUID = loadUUID(execDir)
 
 	SERVER_URL_INFO = fmt.Sprintf("%s/api/report/info/%s", SERVER_URL, UUID)
 	SERVER_URL_COLLECTION = fmt.Sprintf("%s/api/report/collection/%s", SERVER_URL, UUID)
