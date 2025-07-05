@@ -237,8 +237,8 @@ func getCPUInfo() string {
 		return "Unknown CPU"
 	}
 
-	logMessage(DEBUG, fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName))
-	return fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName)
+	logMessage(DEBUG, fmt.Sprintf("%vx %v", len(info), info[0].ModelName))
+	return fmt.Sprintf("%vx %v", len(info), info[0].ModelName)
 }
 
 func getTemperature() string {

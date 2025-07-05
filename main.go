@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20250705.1-golang"
+	VERSION               = "Alpha-20250705.2-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
