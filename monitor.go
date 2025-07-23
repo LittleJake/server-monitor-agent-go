@@ -256,8 +256,7 @@ func getTemperature() string {
 }
 
 func getUptime() string {
-	bootTime, _ := host.BootTime()
-	uptime := uint64(time.Now().Unix()) - bootTime
+	uptime, _ := host.Uptime()
 
 	delta := time.Duration(uptime) * time.Second
 
