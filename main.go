@@ -16,6 +16,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 )
 
 var (
@@ -99,8 +100,8 @@ func init() {
 	SERVER_URL_HASH = fmt.Sprintf("%s/api/report/hash/%s", SERVER_URL, UUID)
 	SERVER_URL_COMMAND = fmt.Sprintf("%s/api/report/command/%s", SERVER_URL, UUID)
 
-	IPV4_API = getEnv("IPV4_API", "https://api-ipv4.ip.sb/ip")
-	IPV6_API = getEnv("IPV6_API", "https://api-ipv6.ip.sb/ip")
+	IPV4_API = getEnv("IPV4_API", "https://4.ident.me/")
+	IPV6_API = getEnv("IPV6_API", "https://6.ident.me/")
 
 	// Initialize logger
 	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
@@ -108,6 +109,22 @@ func init() {
 
 	getIP()
 	getCountry()
+	cronJob := cron.New()
+	_, err = cronJob.AddFunc("@hourly", func() {
+		logMessage(INFO, "Updating IP Address")
+		getIP()
+	})
+	if err != nil {
+		logMessage(ERROR, fmt.Sprintf("Error adding cron job 'getIP()': %v", err))
+	}
+	_, err = cronJob.AddFunc("@hourly", func() {
+		logMessage(INFO, "Updating Country Information")
+		getCountry()
+	})
+	if err != nil {
+		logMessage(ERROR, fmt.Sprintf("Error adding cron job 'getCountry()': %v", err))
+	}
+	cronJob.Start()
 
 	CPU = getCPUInfo()
 	SYSTEM_VERSION = getSysVersion()
