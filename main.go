@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20260123.1-golang"
+	VERSION               = "Alpha-20260124.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -173,7 +173,7 @@ func getAggregateStat() map[string]interface{} {
 }
 
 func getInfo() map[string]interface{} {
-
+	UPTIME = getUptime()
 	info := map[string]interface{}{
 		"Connection":     getConnections(),
 		"Country":        COUNTRY["country_name"],
@@ -255,7 +255,7 @@ func getRequest(url string, headers map[string]string) (string, error) {
 		return "", err
 	}
 
-	logMessage("DEBUG", string(body))
+	logMessage(DEBUG, string(body))
 	return string(body), nil
 }
 
@@ -285,7 +285,7 @@ func getCountry() {
 		"country_code": "Unknown",
 	}
 
-	data, err := getRequest("https://ip-api.io/json", map[string]string{})
+	data, err := getRequest("https://reallyfreegeoip.org/json/", map[string]string{})
 	if err != nil {
 		logMessage(ERROR, "Fail to get country")
 		return
