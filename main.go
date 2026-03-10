@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20260310.2-golang"
+	VERSION               = "Alpha-20260310.3-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -296,7 +296,9 @@ func getCountry() {
 		data, err = getRequest(url, map[string]string{})
 		if err != nil {
 			logMessage(ERROR, fmt.Sprintf("Fail to fetch country from %v", url))
-		}
+			continue
+		} 
+		break
 	}
 
 	if err != nil {
