@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20260310.3-golang"
+	VERSION               = "Alpha-20260310.4-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -194,6 +194,15 @@ func getInfo() map[string]interface{} {
 	return info
 }
 
+func FirstNonEmpty(def any, vals ...any) any {
+    for _, v := range vals {
+        if v != nil {
+            return v
+        }
+    }
+    return def
+}
+
 func postRequest(url string, headers map[string]string, data string) (string, error) {
 
 	// Post data to the server
@@ -314,16 +323,18 @@ func getCountry() {
 		logMessage(ERROR, "Fail to parse country")
 		return
 	}
+
+	
 	COUNTRY = map[string]string{
-		"country_name": country["country_name"].(string),
-		"country_code": country["country_code"].(string),
+		"country_name": FirstNonEmpty("Unknown", country["country_name"], country["country"]).(string),
+		"country_code": FirstNonEmpty("Unknown", country["country_code"], country["countryCode"]).(string),
 	}
 
-	if strings.Contains(country["country_name"].(string), "Hong Kong") ||
-		strings.Contains(country["country_name"].(string), "Hong Kong") {
-		COUNTRY["country_name"] = country["country_name"].(string) + ", SAR"
-	} else if strings.Contains(country["country_name"].(string), "Taiwan") {
-		COUNTRY["country_name"] = country["country_name"].(string) + " Province"
+	if strings.Contains(COUNTRY["country_name"], "Hong Kong") ||
+		strings.Contains(COUNTRY["country_name"], "Macau") {
+		COUNTRY["country_name"] = COUNTRY["country_name"] + ", SAR"
+	} else if strings.Contains(COUNTRY["country_name"], "Taiwan") {
+		COUNTRY["country_name"] = COUNTRY["country_name"] + " Province"
 		COUNTRY["country_code"] = "CN"
 	}
 
