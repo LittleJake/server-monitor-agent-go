@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20260310.1-golang"
+	VERSION               = "Alpha-20260310.2-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -285,21 +285,25 @@ func getCountry() {
 		"country_name": "Unknown",
 		"country_code": "Unknown",
 	}
-	
-	var data, err
+
+	var (
+		data string
+		err  error
+	)
+
 	for _, url := range IPINFO_API {
-	    logMessage(INFO, fmt.Sprintf("Fetching country from %v", url))
+		logMessage(INFO, fmt.Sprintf("Fetching country from %v", url))
 		data, err = getRequest(url, map[string]string{})
 		if err != nil {
-			logMessage(ERROR,  fmt.Sprintf("Fail to fetch country from %v", url))
+			logMessage(ERROR, fmt.Sprintf("Fail to fetch country from %v", url))
 		}
 	}
-	
+
 	if err != nil {
 		logMessage(ERROR, "Fail to fetch country")
 		return
 	}
-	
+
 	logMessage(DEBUG, data)
 
 	var country map[string]interface{}
