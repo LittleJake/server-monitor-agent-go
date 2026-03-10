@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	VERSION               = "Alpha-20260124.1-golang"
+	VERSION               = "Alpha-20260310.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -49,6 +49,7 @@ var (
 	SYSTEM_VERSION        string
 	UPTIME                string
 	ALIVE_CHECK_TIME      int
+	IPINFO_API            = []string{"https://ipwhois.app/json/", "https://reallyfreegeoip.org/json/"}
 )
 
 func loadUUID(execDir string) string {
@@ -284,19 +285,27 @@ func getCountry() {
 		"country_name": "Unknown",
 		"country_code": "Unknown",
 	}
-
-	data, err := getRequest("https://reallyfreegeoip.org/json/", map[string]string{})
+	
+	var data, err
+	for _, url := range IPINFO_API {
+	    logMessage(INFO, fmt.Sprintf("Fetching country from %v", url))
+		data, err = getRequest(url, map[string]string{})
+		if err != nil {
+			logMessage(ERROR,  fmt.Sprintf("Fail to fetch country from %v", url))
+		}
+	}
+	
 	if err != nil {
-		logMessage(ERROR, "Fail to get country")
+		logMessage(ERROR, "Fail to fetch country")
 		return
 	}
-
+	
 	logMessage(DEBUG, data)
 
 	var country map[string]interface{}
 	err = json.Unmarshal([]byte(data), &country)
 	if err != nil {
-		logMessage(ERROR, "Fail to get country")
+		logMessage(ERROR, "Fail to parse country")
 		return
 	}
 	COUNTRY = map[string]string{
