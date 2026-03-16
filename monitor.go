@@ -281,11 +281,11 @@ func getConnections() string {
 func getSysVersion() string {
 	info, _ := host.Info()
 
-	logMessage(DEBUG, fmt.Sprintf("%v %v %v\n", info.OS, info.Platform, info.PlatformVersion))
+	logMessage(DEBUG, fmt.Sprintf("%v %v %v\n", strings.Title(info.OS), strings.Title(info.Platform), strings.Title(info.PlatformVersion)))
 	if info.Platform != "" {
-		return fmt.Sprintf("%v %v", info.Platform, info.PlatformVersion)
+		return fmt.Sprintf("%v %v", strings.Title(info.Platform), strings.Title(info.PlatformVersion))
 	} else {
-		return fmt.Sprintf("%v %v", info.OS, info.PlatformVersion)
+		return fmt.Sprintf("%v %v", strings.Title(info.OS), strings.Title(info.PlatformVersion))
 	}
 }
 
