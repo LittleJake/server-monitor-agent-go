@@ -28,7 +28,7 @@ import (
 var defaultCACerts []byte
 
 var (
-	VERSION               = "Alpha-20260626.1-golang"
+	VERSION               = "Alpha-20260626.2-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -59,7 +59,6 @@ var (
 	ALIVE_CHECK_TIME      int
 	IPINFO_API            = []string{"https://ipwhois.app/json/", "https://reallyfreegeoip.org/json/"}
     TLS_CONFIG            *tls.Config
-	RESOLVER              *net.Resolver
 )
 
 func loadUUID(execDir string) string {
@@ -113,7 +112,7 @@ func init() {
 		"[2606:4700:4700::1111]:53",
 	}
 
-	RESOLVER := &net.Resolver{
+	net.DefaultResolver = &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
@@ -131,8 +130,6 @@ func init() {
 			return nil, fmt.Errorf("Error connect DNS server: %w", lastErr)
 		},
 	}
-
-	net.DefaultResolver = RESOLVER
 	//dns end
 
 	HOST = getEnv("HOST", "localhost")
