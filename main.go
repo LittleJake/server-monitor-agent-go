@@ -6,12 +6,17 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"crypto/tls"
+	"crypto/x509"
+	"context"
+	_ "embed"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
@@ -19,8 +24,11 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+//go:embed cacert.pem
+var defaultCACerts []byte
+
 var (
-	VERSION               = "Alpha-20260310.4-golang"
+	VERSION               = "Alpha-20260626.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -50,6 +58,8 @@ var (
 	UPTIME                string
 	ALIVE_CHECK_TIME      int
 	IPINFO_API            = []string{"https://ipwhois.app/json/", "https://reallyfreegeoip.org/json/"}
+    TLS_CONFIG            *tls.Config
+	RESOLVER              *net.Resolver
 )
 
 func loadUUID(execDir string) string {
@@ -68,6 +78,10 @@ func loadUUID(execDir string) string {
 }
 
 func init() {
+	// Initialize logger
+	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
+	setLogLevel(LOG_LEVEL)
+
 	execPath, err := os.Executable()
 	if err != nil {
 		log.Fatalf("Error getting executable path: %v", err)
@@ -79,6 +93,47 @@ func init() {
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+
+	// pem
+	certPool := x509.NewCertPool()
+
+	if ok := certPool.AppendCertsFromPEM(defaultCACerts); !ok {
+		log.Fatal("Fail to load cacert.")
+	}
+
+	TLS_CONFIG = &tls.Config{
+		RootCAs: certPool,
+	}
+
+	//dns start
+	dnsServers := []string{
+		"8.8.8.8 :53",
+		"[2001:4860:4860::8844]:53",
+		"1.1.1.1:53",
+		"[2606:4700:4700::1111]:53",
+	}
+
+	RESOLVER := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: 1500 * time.Millisecond,
+			}
+
+			var lastErr error
+			for _, dns := range dnsServers {
+				conn, err := d.DialContext(ctx, "udp", dns)
+				if err == nil {
+					return conn, nil
+				}
+				lastErr = err
+			}
+			return nil, fmt.Errorf("Error connect DNS server: %w", lastErr)
+		},
+	}
+
+	net.DefaultResolver = RESOLVER
+	//dns end
 
 	HOST = getEnv("HOST", "localhost")
 	PORT = getEnv("PORT", "6379")
@@ -104,9 +159,6 @@ func init() {
 	IPV4_API = getEnv("IPV4_API", "https://4.ident.me/")
 	IPV6_API = getEnv("IPV6_API", "https://6.ident.me/")
 
-	// Initialize logger
-	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
-	setLogLevel(LOG_LEVEL)
 
 	getIP()
 	getCountry()
@@ -141,14 +193,47 @@ func getEnv(key, defaultValue string) string {
 }
 
 func getRedisConn() redis.Conn {
-	// Connect to Redis
-	conn, err := redis.Dial(
-		"tcp",
-		fmt.Sprintf("%v:%v", HOST, PORT),
-		redis.DialUseTLS(SSL),
-		redis.DialConnectTimeout(time.Duration(SOCKET_TIMEOUT)*time.Second),
-		redis.DialPassword(PASSWORD),
+	var (
+		conn   redis.Conn
+		err    error
 	)
+
+	if SSL {
+
+		// Connect to Redis
+		conn, err = redis.Dial(
+			"tcp",
+			fmt.Sprintf("%v:%v", HOST, PORT),
+			redis.DialNetDial(func(network, address string) (net.Conn, error) {
+				dialer := &net.Dialer{
+					Timeout:   time.Duration(SOCKET_TIMEOUT) * time.Second,
+					KeepAlive: 30 * time.Second,
+					Resolver:  net.DefaultResolver,
+				}
+				return dialer.Dial(network, address)
+			}),
+			redis.DialUseTLS(SSL),
+			redis.DialPassword(PASSWORD),
+			redis.DialTLSConfig(TLS_CONFIG),
+		)
+	} else {
+		// Connect to Redis
+		conn, err = redis.Dial(
+			"tcp",
+			fmt.Sprintf("%v:%v", HOST, PORT),
+			redis.DialNetDial(func(network, address string) (net.Conn, error) {
+				dialer := &net.Dialer{
+					Timeout:   time.Duration(SOCKET_TIMEOUT) * time.Second,
+					KeepAlive: 30 * time.Second,
+					Resolver:  net.DefaultResolver,
+				}
+				return dialer.Dial(network, address)
+			}),
+			redis.DialConnectTimeout(time.Duration(SOCKET_TIMEOUT)*time.Second),
+			redis.DialPassword(PASSWORD),
+		)
+	}
+	
 	if err != nil {
 		logMessage(ERROR, fmt.Sprintf("Error connecting to Redis: %v", err))
 		return nil
@@ -208,6 +293,18 @@ func postRequest(url string, headers map[string]string, data string) (string, er
 	// Post data to the server
 	client := &http.Client{
 		Timeout: time.Duration(SOCKET_TIMEOUT) * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSClientConfig:       TLS_CONFIG,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
 	}
 	req, err := http.NewRequest("POST", url, strings.NewReader(data))
 	if err != nil {
@@ -240,6 +337,18 @@ func getRequest(url string, headers map[string]string) (string, error) {
 	// Post data to the server
 	client := &http.Client{
 		Timeout: time.Duration(SOCKET_TIMEOUT) * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSClientConfig:       TLS_CONFIG,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
