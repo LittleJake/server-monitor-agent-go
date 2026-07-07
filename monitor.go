@@ -237,8 +237,8 @@ func getCPUInfo() string {
 		return "Unknown CPU"
 	}
 
-	logMessage(DEBUG, fmt.Sprintf("%vx %v", len(info), info[0].ModelName))
-	return fmt.Sprintf("%vx %v", len(info), info[0].ModelName)
+	logMessage(DEBUG, fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName))
+	return fmt.Sprintf("%vx %v", info[0].Cores, info[0].ModelName)
 }
 
 func getTemperature() string {
@@ -312,9 +312,9 @@ func getLoad() string {
 
 	total := (cpuTimes[0].User + cpuTimes[0].System + cpuTimes[0].Idle + cpuTimes[0].Nice +
 		cpuTimes[0].Iowait + cpuTimes[0].Irq + cpuTimes[0].Softirq + cpuTimes[0].Steal +
-		cpuTimes[0].Guest + cpuTimes[0].GuestNice) - (CPU_FORMER[0].User + CPU_FORMER[0].System + CPU_FORMER[0].Idle + CPU_FORMER[0].Nice +
-		CPU_FORMER[0].Iowait + CPU_FORMER[0].Irq + CPU_FORMER[0].Softirq + CPU_FORMER[0].Steal +
-		CPU_FORMER[0].Guest + CPU_FORMER[0].GuestNice)
+		cpuTimes[0].Guest + cpuTimes[0].GuestNice) - (CPU_FORMER[0].User + CPU_FORMER[0].System +
+		CPU_FORMER[0].Idle + CPU_FORMER[0].Nice + CPU_FORMER[0].Iowait + CPU_FORMER[0].Irq +
+		CPU_FORMER[0].Softirq + CPU_FORMER[0].Steal + CPU_FORMER[0].Guest + CPU_FORMER[0].GuestNice)
 
 	percentages := map[string]string{
 		"user":       fmt.Sprintf("%.2f", ((cpuTimes[0].User-CPU_FORMER[0].User)/total)*100),

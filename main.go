@@ -1,22 +1,22 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"crypto/tls"
-	"crypto/x509"
-	"context"
-	_ "embed"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
@@ -28,7 +28,7 @@ import (
 var defaultCACerts []byte
 
 var (
-	VERSION               = "Alpha-20260626.2-golang"
+	VERSION               = "Alpha-20260707.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -42,6 +42,9 @@ var (
 	REPORT_TIME           int
 	RETENTION_TIME        int
 	DATA_TIMEOUT          int
+	DISK_EXCLUDE          string
+	DISK_FS_EXCLUDE       string
+	DISK_OPTS_EXCLUDE     string
 	UUID                  string
 	USER_AGENT            = VERSION + " +https://github.com/LittleJake/server-monitor-agent-go"
 	SERVER_URL_INFO       string
@@ -58,7 +61,7 @@ var (
 	UPTIME                string
 	ALIVE_CHECK_TIME      int
 	IPINFO_API            = []string{"https://ipwhois.app/json/", "https://reallyfreegeoip.org/json/"}
-    TLS_CONFIG            *tls.Config
+	TLS_CONFIG            *tls.Config
 )
 
 func loadUUID(execDir string) string {
@@ -77,9 +80,6 @@ func loadUUID(execDir string) string {
 }
 
 func init() {
-	// Initialize logger
-	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
-	setLogLevel(LOG_LEVEL)
 
 	execPath, err := os.Executable()
 	if err != nil {
@@ -132,6 +132,11 @@ func init() {
 	}
 	//dns end
 
+	// Initialize logger
+	LOG_LEVEL = getEnv("LOG_LEVEL", "INFO")
+	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
+	setLogLevel(LOG_LEVEL)
+
 	HOST = getEnv("HOST", "localhost")
 	PORT = getEnv("PORT", "6379")
 	SSL, _ = strconv.ParseBool(getEnv("SSL", "false"))
@@ -145,8 +150,10 @@ func init() {
 	REPORT_MODE = strings.ToLower(getEnv("REPORT_MODE", "redis"))
 	SERVER_TOKEN = getEnv("SERVER_TOKEN", "")
 	PASSWORD = getEnv("PASSWORD", "")
-	LOG_LEVEL = getEnv("LOG_LEVEL", "INFO")
 	UUID = loadUUID(execDir)
+	DISK_EXCLUDE = strings.ToLower(getEnv("DISK_EXCLUDE", "/run,/sys,/boot,/dev,/proc,/gdrive,/var/lib"))
+	DISK_FS_EXCLUDE = strings.ToLower(getEnv("DISK_FS_EXCLUDE", "tmpfs,overlay"))
+	DISK_OPTS_EXCLUDE = strings.ToLower(getEnv("DISK_OPTS_EXCLUDE", "ro"))
 
 	SERVER_URL_INFO = fmt.Sprintf("%s/api/report/info/%s", SERVER_URL, UUID)
 	SERVER_URL_COLLECTION = fmt.Sprintf("%s/api/report/collection/%s", SERVER_URL, UUID)
@@ -155,7 +162,6 @@ func init() {
 
 	IPV4_API = getEnv("IPV4_API", "https://4.ident.me/")
 	IPV6_API = getEnv("IPV6_API", "https://6.ident.me/")
-
 
 	getIP()
 	getCountry()
@@ -191,8 +197,8 @@ func getEnv(key, defaultValue string) string {
 
 func getRedisConn() redis.Conn {
 	var (
-		conn   redis.Conn
-		err    error
+		conn redis.Conn
+		err  error
 	)
 
 	if SSL {
@@ -230,7 +236,7 @@ func getRedisConn() redis.Conn {
 			redis.DialPassword(PASSWORD),
 		)
 	}
-	
+
 	if err != nil {
 		logMessage(ERROR, fmt.Sprintf("Error connecting to Redis: %v", err))
 		return nil
@@ -242,7 +248,7 @@ func getRedisConn() redis.Conn {
 func getAggregateStat() map[string]interface{} {
 	aggregateStat := map[string]interface{}{
 		"Battery": json.RawMessage("{}"),
-		"Disk":    json.RawMessage(getDiskInfo()),
+		"Disk":    json.RawMessage(getDiskInfo(DISK_OPTS_EXCLUDE, DISK_FS_EXCLUDE, DISK_EXCLUDE)),
 		"Fan":     json.RawMessage("{}"),
 		"IO":      json.RawMessage(getIO()),
 		"Load":    json.RawMessage(getLoad()),
@@ -277,12 +283,12 @@ func getInfo() map[string]interface{} {
 }
 
 func FirstNonEmpty(def any, vals ...any) any {
-    for _, v := range vals {
-        if v != nil {
-            return v
-        }
-    }
-    return def
+	for _, v := range vals {
+		if v != nil {
+			return v
+		}
+	}
+	return def
 }
 
 func postRequest(url string, headers map[string]string, data string) (string, error) {
@@ -412,7 +418,7 @@ func getCountry() {
 		if err != nil {
 			logMessage(ERROR, fmt.Sprintf("Fail to fetch country from %v", url))
 			continue
-		} 
+		}
 		break
 	}
 
@@ -430,7 +436,6 @@ func getCountry() {
 		return
 	}
 
-	
 	COUNTRY = map[string]string{
 		"country_name": FirstNonEmpty("Unknown", country["country_name"], country["country"]).(string),
 		"country_code": FirstNonEmpty("Unknown", country["country_code"], country["countryCode"]).(string),
