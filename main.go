@@ -28,7 +28,7 @@ import (
 var defaultCACerts []byte
 
 var (
-	VERSION               = "Alpha-20260707.1-golang"
+	VERSION               = "Alpha-20260817.1-golang"
 	LOG_LEVEL             string
 	HOST                  string
 	PORT                  string
@@ -62,6 +62,7 @@ var (
 	ALIVE_CHECK_TIME      int
 	IPINFO_API            = []string{"https://ipwhois.app/json/", "https://reallyfreegeoip.org/json/"}
 	TLS_CONFIG            *tls.Config
+	HTTP_CLIENT           *http.Client
 )
 
 func loadUUID(execDir string) string {
@@ -139,13 +140,13 @@ func init() {
 
 	HOST = getEnv("HOST", "localhost")
 	PORT = getEnv("PORT", "6379")
-	SSL, _ = strconv.ParseBool(getEnv("SSL", "false"))
-	REPORT_ONCE, _ = strconv.ParseBool(getEnv("REPORT_ONCE", "false"))
-	SOCKET_TIMEOUT, _ = strconv.Atoi(getEnv("SOCKET_TIMEOUT", "10"))
-	REPORT_TIME, _ = strconv.Atoi(getEnv("REPORT_TIME", "60"))
-	RETENTION_TIME, _ = strconv.Atoi(getEnv("RETENTION_TIME", "86400"))   // 1 day
-	DATA_TIMEOUT, _ = strconv.Atoi(getEnv("DATA_TIMEOUT", "259200"))      // 3 days
-	ALIVE_CHECK_TIME, _ = strconv.Atoi(getEnv("ALIVE_CHECK_TIME", "600")) // 10 minutes
+	SSL = getEnvBool("SSL", false)
+	REPORT_ONCE = getEnvBool("REPORT_ONCE", false)
+	SOCKET_TIMEOUT = getEnvInt("SOCKET_TIMEOUT", 10)
+	REPORT_TIME = getEnvInt("REPORT_TIME", 60)
+	RETENTION_TIME = getEnvInt("RETENTION_TIME", 86400)   // 1 day
+	DATA_TIMEOUT = getEnvInt("DATA_TIMEOUT", 259200)      // 3 days
+	ALIVE_CHECK_TIME = getEnvInt("ALIVE_CHECK_TIME", 600) // 10 minutes
 	SERVER_URL = getEnv("SERVER_URL", "http://localhost:8000")
 	REPORT_MODE = strings.ToLower(getEnv("REPORT_MODE", "redis"))
 	SERVER_TOKEN = getEnv("SERVER_TOKEN", "")
@@ -162,6 +163,23 @@ func init() {
 
 	IPV4_API = getEnv("IPV4_API", "https://4.ident.me/")
 	IPV6_API = getEnv("IPV6_API", "https://6.ident.me/")
+
+	//init http client
+	HTTP_CLIENT = &http.Client{
+		Timeout: time.Duration(SOCKET_TIMEOUT) * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSClientConfig:       TLS_CONFIG,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 
 	getIP()
 	getCountry()
@@ -193,6 +211,20 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if v, err := strconv.ParseBool(getEnv(key, fmt.Sprintf("%t", defaultValue))); err == nil {
+		return v
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if v, err := strconv.Atoi(getEnv(key, fmt.Sprintf("%d", defaultValue))); err == nil {
+		return v
+	}
+	return defaultValue
 }
 
 func getRedisConn() redis.Conn {
@@ -291,25 +323,8 @@ func FirstNonEmpty(def any, vals ...any) any {
 	return def
 }
 
-func postRequest(url string, headers map[string]string, data string) (string, error) {
-
-	// Post data to the server
-	client := &http.Client{
-		Timeout: time.Duration(SOCKET_TIMEOUT) * time.Second,
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			TLSClientConfig:       TLS_CONFIG,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	}
-	req, err := http.NewRequest("POST", url, strings.NewReader(data))
+func doRequest(method string, url string, headers map[string]string, data string) (string, error) {
+	req, err := http.NewRequest(method, url, strings.NewReader(data))
 	if err != nil {
 		logMessage(ERROR, fmt.Sprintf("Error creating request: %v", err))
 		return "", err
@@ -319,54 +334,9 @@ func postRequest(url string, headers map[string]string, data string) (string, er
 		req.Header.Set(key, value)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := HTTP_CLIENT.Do(req)
 	if err != nil {
-		logMessage(ERROR, fmt.Sprintf("Error post data: %v", err))
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logMessage(ERROR, fmt.Sprintf("Error reading response body: %v", err))
-		return "", err
-	}
-
-	logMessage(DEBUG, string(body))
-	return string(body), nil
-}
-
-func getRequest(url string, headers map[string]string) (string, error) {
-	// Post data to the server
-	client := &http.Client{
-		Timeout: time.Duration(SOCKET_TIMEOUT) * time.Second,
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			TLSClientConfig:       TLS_CONFIG,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		logMessage(ERROR, fmt.Sprintf("Error creating request: %v", err))
-		return "", err
-	}
-
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		logMessage(ERROR, fmt.Sprintf("Fail to get data: %v", err))
+		logMessage(ERROR, fmt.Sprintf("Error %s data: %v", method, err))
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -388,11 +358,11 @@ func replaceString(input, pattern, replacement string) string {
 
 func getIP() {
 	var err error
-	IPV4, err = getRequest(IPV4_API, map[string]string{})
+	IPV4, err = doRequest("GET", IPV4_API, map[string]string{}, "")
 	if err != nil {
 		IPV4 = "None"
 	}
-	IPV6, err = getRequest(IPV6_API, map[string]string{})
+	IPV6, err = doRequest("GET", IPV6_API, map[string]string{}, "")
 	if err != nil {
 		IPV6 = "None"
 	}
@@ -414,7 +384,7 @@ func getCountry() {
 
 	for _, url := range IPINFO_API {
 		logMessage(INFO, fmt.Sprintf("Fetching country from %v", url))
-		data, err = getRequest(url, map[string]string{})
+		data, err = doRequest("GET", url, map[string]string{}, "")
 		if err != nil {
 			logMessage(ERROR, fmt.Sprintf("Fail to fetch country from %v", url))
 			continue
@@ -500,9 +470,9 @@ func report() {
 		if SERVER_TOKEN == "" {
 			log.Fatalf("Please generate server token using `php think token add --uuid %s`", UUID)
 		}
-		postRequest(SERVER_URL_HASH, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, "{\"ip\": \"none\"}")
-		postRequest(SERVER_URL_INFO, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, string(jsonInfo))
-		postRequest(SERVER_URL_COLLECTION, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, string(jsonAggregateStat))
+		doRequest("POST", SERVER_URL_HASH, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, "{\"ip\": \"none\"}")
+		doRequest("POST", SERVER_URL_INFO, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, string(jsonInfo))
+		doRequest("POST", SERVER_URL_COLLECTION, map[string]string{"User-Agent": USER_AGENT, "Content-Type": "application/json", "authorization": SERVER_TOKEN}, string(jsonAggregateStat))
 
 		logMessage("INFO", "Finish Reporting")
 	}

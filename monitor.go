@@ -62,7 +62,7 @@ func getDiskInfo(exclude ...string) string {
 	}
 	excludeDisk := ""
 	if len(exclude) > 2 {
-		excludeDisk = exclude[1]
+		excludeDisk = exclude[2]
 	}
 	// Get disk usage
 	partitions, _ := disk.Partitions(false)
